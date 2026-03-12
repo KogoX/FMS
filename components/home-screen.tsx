@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Image from "next/image"
 import {
   MapPin,
@@ -11,17 +11,23 @@ import {
   Navigation,
   X,
   Clock,
+  Star,
 } from "lucide-react"
 import type { LocationData } from "@/hooks/use-geolocation"
 import { searchLocation } from "@/hooks/use-geolocation"
+import type { FoodItem } from "@/lib/store"
+import { LoadingSpinner } from "@/components/loading-spinner"
 
 interface HomeScreenProps {
   onNavigateSearch: (category?: string) => void
+  onSelectItem: (item: FoodItem) => void
   location: LocationData | null
   locationLoading: boolean
   locationError: string | null
   onRefreshLocation: () => void
   onSetManualLocation: (city: string, address: string) => void
+  foodItems: FoodItem[]
+  foodLoading?: boolean
 }
 
 interface SearchResult {
@@ -40,16 +46,20 @@ const categories = [
 
 export function HomeScreen({
   onNavigateSearch,
+  onSelectItem,
   location,
   locationLoading,
   locationError,
   onRefreshLocation,
   onSetManualLocation,
+  foodItems,
+  foodLoading,
 }: HomeScreenProps) {
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [homeQuery, setHomeQuery] = useState("")
   const [recentLocations, setRecentLocations] = useState<
     Array<{ city: string; address: string }>
   >([])
@@ -106,6 +116,34 @@ export function HomeScreen({
     setSearchResults([])
   }
 
+  const filteredHomeItems = useMemo(() => {
+    if (homeQuery.trim().length < 2) return []
+    const query = homeQuery.toLowerCase()
+    return foodItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query)
+    )
+  }, [homeQuery, foodItems])
+
+  const featuredItems = useMemo(() => foodItems.slice(0, 4), [foodItems])
+
+  const topRatedItems = useMemo(() => {
+    return [...foodItems]
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 3)
+  }, [foodItems])
+
+  const fastDeliveryItems = useMemo(() => {
+    const parseDelivery = (value: string) => {
+      const match = value.match(/\d+/)
+      return match ? Number(match[0]) : 999
+    }
+    return [...foodItems]
+      .sort((a, b) => parseDelivery(a.deliveryTime) - parseDelivery(b.deliveryTime))
+      .slice(0, 3)
+  }, [foodItems])
+
   return (
     <div className="flex flex-col pb-20">
       {/* Header */}
@@ -148,53 +186,312 @@ export function HomeScreen({
         </button>
       </header>
 
-      {/* Promo Banner */}
-      <div className="px-5 md:px-8 mt-3 md:mt-5">
-        <div className="relative rounded-2xl overflow-hidden bg-primary h-44 md:h-56 lg:h-64">
-          <Image
-            src="/images/summer-combo.jpg"
-            alt="Summer Combo Deal"
-            fill
-            className="object-cover"
-          />
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/70 to-transparent h-1/2 z-10" />
-          <div className="relative z-20 flex flex-col justify-end h-full p-5">
-            <p className="text-card text-xs font-semibold uppercase tracking-wider">
-              Summer Combo
+      {/* Search Everything */}
+      <section className="px-5 md:px-8 mt-3 md:mt-5">
+        <div className="rounded-2xl border border-border bg-secondary/30 p-4">
+          <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+            Search Everything
+          </p>
+          <h2 className="text-lg font-bold text-foreground mt-1">
+            Find food, categories, and fast deals
+          </h2>
+          <div className="relative mt-3">
+            <input
+              type="text"
+              value={homeQuery}
+              onChange={(e) => setHomeQuery(e.target.value)}
+              placeholder="Search for burgers, pizza, burrito, or a dish"
+              className="w-full bg-card rounded-xl py-3 pl-4 pr-12 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => onNavigateSearch()}
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-primary w-9 h-9 rounded-lg flex items-center justify-center"
+              aria-label="Search"
+            >
+              <Search size={16} className="text-primary-foreground" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <button
+                key={category.name}
+                type="button"
+                onClick={() => onNavigateSearch(category.name)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-card text-foreground border border-border hover:border-primary/50 transition-colors"
+              >
+                {category.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => onNavigateSearch()}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/30 hover:border-primary/60 transition-colors"
+            >
+              Deals
+            </button>
+          </div>
+
+          {homeQuery.trim().length >= 2 && (
+            <div className="mt-4 rounded-xl border border-border bg-card">
+              {filteredHomeItems.length === 0 ? (
+                <div className="px-4 py-4 text-sm text-muted-foreground">
+                  No matches yet. Try a different keyword.
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {filteredHomeItems.slice(0, 5).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectItem(item)}
+                      className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 text-left hover:bg-secondary/40 transition-colors"
+                    >
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                        <Image
+                          src={item.image || "/placeholder.svg"}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {item.category} · {item.deliveryTime}
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-primary">
+                        ${item.price.toFixed(2)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {homeQuery.trim().length < 2 && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onNavigateSearch()}
+                className="relative rounded-2xl overflow-hidden bg-primary h-28 group text-left"
+              >
+                <Image
+                  src="/images/summer-combo.jpg"
+                  alt="Summer Combo Deal"
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 to-transparent z-10" />
+                <div className="relative z-20 flex flex-col justify-end h-full p-4">
+                  <p className="text-card text-xs font-semibold uppercase tracking-wider">
+                    Summer Combo
+                  </p>
+                  <p className="text-card text-2xl font-bold mt-1">
+                    $10.88
+                  </p>
+                </div>
+              </button>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Quick Links
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {categories.map((category) => (
+                    <button
+                      key={`quick-${category.name}`}
+                      type="button"
+                      onClick={() => onNavigateSearch(category.name)}
+                      className="rounded-xl border border-border px-3 py-2 text-sm font-semibold text-foreground hover:border-primary/50 transition-colors"
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onNavigateSearch()}
+                    className="rounded-xl border border-primary/40 px-3 py-2 text-sm font-semibold text-primary hover:border-primary/70 transition-colors"
+                  >
+                    View All
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Featured Picks */}
+      <section className="mt-6 px-5 md:px-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+              Featured Picks
             </p>
-            <p className="text-card text-3xl font-bold mt-1">
-              $10.88
-            </p>
+            <h3 className="text-lg font-bold text-foreground">
+              Detailed choices for today
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigateSearch()}
+            className="text-xs font-semibold text-primary"
+          >
+            See all
+          </button>
+        </div>
+
+        {foodLoading ? (
+          <div className="mt-6">
+            <LoadingSpinner
+              size="sm"
+              label="Loading menu"
+              sublabel="Fetching fresh picks"
+              variant="inline"
+            />
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {featuredItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSelectItem(item)}
+                className="rounded-2xl border border-border bg-card overflow-hidden text-left hover:shadow-md transition-shadow"
+              >
+                <div className="relative h-36 w-full bg-secondary overflow-hidden">
+                  <Image
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-base font-semibold text-foreground truncate">
+                      {item.name}
+                    </h4>
+                    <span className="text-sm font-semibold text-primary">
+                      ${item.price.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    {item.description}
+                  </p>
+                  <div className="flex items-center gap-3 mt-3 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Star size={12} className="text-primary" />
+                      {item.rating.toFixed(1)}
+                    </span>
+                    <span>{item.deliveryTime}</span>
+                    <span>{item.calories} cal</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Detail Rows */}
+      <section className="mt-6 px-5 md:px-8 grid gap-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-foreground">
+              Top Rated
+            </h4>
+            <button
+              type="button"
+              onClick={() => onNavigateSearch()}
+              className="text-xs font-semibold text-primary"
+            >
+              Explore
+            </button>
+          </div>
+          <div className="mt-3 grid gap-3">
+            {topRatedItems.map((item) => (
+              <button
+                key={`top-${item.id}`}
+                type="button"
+                onClick={() => onSelectItem(item)}
+                className="flex items-center gap-3 rounded-xl border border-border px-3 py-2 text-left hover:border-primary/40 transition-colors"
+              >
+                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                  <Image
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {item.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {item.category} · {item.deliveryTime}
+                  </p>
+                </div>
+                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Star size={12} className="text-primary" />
+                  {item.rating.toFixed(1)}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* Categories */}
-      <div className="mt-6 px-5">
-        <div className="flex flex-col gap-4">
-          {categories.map((category) => (
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-foreground">
+              Fast Delivery
+            </h4>
             <button
-              key={category.name}
               type="button"
-              onClick={() => onNavigateSearch(category.name)}
-              className="relative rounded-2xl overflow-hidden h-28 group"
+              onClick={() => onNavigateSearch()}
+              className="text-xs font-semibold text-primary"
             >
-              <Image
-                src={category.image || "/placeholder.svg"}
-                alt={category.name}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 to-transparent z-10" />
-              <div className="relative z-20 flex items-center justify-center h-full">
-                <h3 className="text-2xl font-bold text-card uppercase tracking-wide drop-shadow-lg">
-                  {category.name}
-                </h3>
-              </div>
+              Explore
             </button>
-          ))}
+          </div>
+          <div className="mt-3 grid gap-3">
+            {fastDeliveryItems.map((item) => (
+              <button
+                key={`fast-${item.id}`}
+                type="button"
+                onClick={() => onSelectItem(item)}
+                className="flex items-center gap-3 rounded-xl border border-border px-3 py-2 text-left hover:border-primary/40 transition-colors"
+              >
+                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                  <Image
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {item.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {item.category} · {item.deliveryTime}
+                  </p>
+                </div>
+                <span className="text-[10px] text-primary font-semibold">
+                  ${item.price.toFixed(2)}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Location Modal */}
       {showLocationModal && (

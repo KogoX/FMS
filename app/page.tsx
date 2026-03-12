@@ -296,11 +296,14 @@ export default function Page() {
       {screen === "home" && (
         <HomeScreen
           onNavigateSearch={handleNavigateSearch}
+          onSelectItem={handleSelectItem}
           location={location}
           locationLoading={locationLoading}
           locationError={locationError}
           onRefreshLocation={refreshLocation}
           onSetManualLocation={setManualLocation}
+          foodItems={foodItems}
+          foodLoading={foodLoading}
         />
       )}
 
