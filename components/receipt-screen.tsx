@@ -104,12 +104,19 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
   const handleDownload = () => {
     if (!receiptRef.current || !order) return
 
+    const transaction = order.transactions?.[0]
+    const receiptCode =
+      transaction?.mpesa_receipt_number ||
+      order.mpesa_transaction_id ||
+      order.receipt_number ||
+      order.id.slice(0, 8)
+
     const content = generateTextReceipt(order, profile)
     const blob = new Blob([content], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `receipt-${order.receipt_number || order.id.slice(0, 8)}.txt`
+    a.download = `receipt-${receiptCode}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -118,11 +125,17 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
     if (!order) return
 
     const content = generateTextReceipt(order, profile)
+    const transaction = order.transactions?.[0]
+    const receiptCode =
+      transaction?.mpesa_receipt_number ||
+      order.mpesa_transaction_id ||
+      order.receipt_number ||
+      order.id.slice(0, 8)
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Receipt ${order.receipt_number}`,
+          title: `Receipt ${receiptCode}`,
           text: content,
         })
       } catch {
@@ -178,6 +191,11 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
   }
 
   const transaction = order.transactions?.[0]
+  const receiptCode =
+    transaction?.mpesa_receipt_number ||
+    order.mpesa_transaction_id ||
+    order.receipt_number ||
+    order.id.slice(0, 12).toUpperCase()
   const isPaid = order.payment_status === "completed"
   const canCancel =
     order.status === "pending" && order.payment_status === "pending"
@@ -281,7 +299,7 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
                   Receipt No.
                 </p>
                 <p className="text-sm font-bold text-foreground mt-0.5">
-                  {order.receipt_number || order.id.slice(0, 12).toUpperCase()}
+                  {receiptCode}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
@@ -538,6 +556,11 @@ function generateTextReceipt(
 ): string {
   const totalKSh = Math.ceil(Number(order.total) * 130)
   const transaction = order.transactions?.[0]
+  const receiptCode =
+    transaction?.mpesa_receipt_number ||
+    order.mpesa_transaction_id ||
+    order.receipt_number ||
+    order.id.slice(0, 12)
   const lines: string[] = []
   const w = 40
 
@@ -546,7 +569,7 @@ function generateTextReceipt(
   lines.push(centerText("Food Delivery Receipt", w))
   lines.push("=".repeat(w))
   lines.push("")
-  lines.push(`Receipt No:  ${order.receipt_number || order.id.slice(0, 12)}`)
+  lines.push(`Receipt No:  ${receiptCode}`)
   lines.push(`Date:        ${new Date(order.created_at).toLocaleString("en-KE")}`)
   lines.push(`Status:      ${order.payment_status === "completed" ? "PAID" : order.status.toUpperCase()}`)
   if (profile?.full_name) {
