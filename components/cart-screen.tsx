@@ -124,20 +124,26 @@ export function CartScreen({
 
           const data = await res.json()
 
-          if (data.status === "completed") {
-            stopPolling()
-            setTransactionId(data.transactionId || checkoutId)
-            setPaymentState("success")
-            // Clear cart in DB and notify parent
-            if (orderIdForPoll) {
-              finalizeOrder(orderIdForPoll)
-            }
-            onOrderComplete?.()
-          } else if (data.status === "failed") {
-            stopPolling()
-            setPaymentState("failed")
-            setErrorMessage(data.message || "Payment failed or was cancelled.")
+        if (data.status === "completed") {
+          stopPolling()
+          setTransactionId(data.transactionId || checkoutId)
+          setPaymentState("success")
+          // Clear cart in DB and notify parent
+          if (orderIdForPoll) {
+            finalizeOrder(orderIdForPoll)
           }
+          onOrderComplete?.()
+        } else if (data.status === "cancelled") {
+          stopPolling()
+          setPaymentState("cancelled")
+          setErrorMessage(
+            data.message || "Payment was cancelled on your phone."
+          )
+        } else if (data.status === "failed") {
+          stopPolling()
+          setPaymentState("failed")
+          setErrorMessage(data.message || "Payment failed or was cancelled.")
+        }
           // "pending" -> continue polling
         } catch {
           // Network error, keep polling
@@ -425,35 +431,38 @@ export function CartScreen({
           </div>
 
           {/* Error Message */}
-          {errorMessage && paymentState === "failed" && (
-            <div className="mx-5 mt-4 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 flex items-start gap-3">
-              <AlertCircle
-                size={16}
-                className="text-destructive mt-0.5 flex-shrink-0"
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">
-                  Payment Failed
-                </p>
-                <p className="text-xs text-destructive/80 mt-0.5">
-                  {errorMessage}
-                </p>
-              </div>
+        {errorMessage &&
+          (paymentState === "failed" || paymentState === "cancelled") && (
+          <div className="mx-5 mt-4 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 flex items-start gap-3">
+            <AlertCircle
+              size={16}
+              className="text-destructive mt-0.5 flex-shrink-0"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">
+                {paymentState === "cancelled"
+                  ? "Payment Cancelled"
+                  : "Payment Failed"}
+              </p>
+              <p className="text-xs text-destructive/80 mt-0.5">
+                {errorMessage}
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
           {/* Order Now / Retry Button */}
           <div className="px-5 mt-6">
-            {paymentState === "failed" ? (
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-              >
-                <Smartphone size={16} />
-                Try Again
-              </button>
-            ) : (
+          {paymentState === "failed" || paymentState === "cancelled" ? (
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <Smartphone size={16} />
+              Try Again
+            </button>
+          ) : (
               <button
                 type="button"
                 onClick={handleOrderNow}
@@ -561,7 +570,6 @@ export function CartScreen({
                 stopPolling()
                 setPaymentState("cancelled")
                 setErrorMessage("Payment was cancelled.")
-                handleRetry()
               }}
               className="mt-4 text-sm text-destructive font-medium hover:underline"
             >

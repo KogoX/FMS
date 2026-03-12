@@ -46,12 +46,53 @@ export async function POST(request: Request) {
       }
     }
 
+    const updateOrderAndTransaction = async (
+      updates: { payment_status: string; status: string },
+      transactionUpdates: { status: string; result_code: string; result_desc: string }
+    ) => {
+      const updatedAt = new Date().toISOString()
+      if (orderId) {
+        await supabase
+          .from("orders")
+          .update({ ...updates, updated_at: updatedAt })
+          .eq("id", orderId)
+          .eq("user_id", user.id)
+        await supabase
+          .from("transactions")
+          .update({ ...transactionUpdates, updated_at: updatedAt })
+          .eq("order_id", orderId)
+          .eq("user_id", user.id)
+        return
+      }
+
+      // Fallback to checkoutRequestId if orderId wasn't provided
+      await supabase
+        .from("orders")
+        .update({ ...updates, updated_at: updatedAt })
+        .eq("mpesa_transaction_id", checkoutRequestId)
+        .eq("user_id", user.id)
+
+      await supabase
+        .from("transactions")
+        .update({ ...transactionUpdates, updated_at: updatedAt })
+        .eq("checkout_request_id", checkoutRequestId)
+        .eq("user_id", user.id)
+    }
+
     // Query Safaricom for real-time status
     try {
       const queryResult = await querySTKPushStatus(checkoutRequestId)
 
       if (queryResult.ResultCode === "0") {
         // Payment completed
+        await updateOrderAndTransaction(
+          { payment_status: "completed", status: "confirmed" },
+          {
+            status: "completed",
+            result_code: queryResult.ResultCode,
+            result_desc: queryResult.ResultDesc,
+          }
+        )
         return NextResponse.json({
           status: "completed",
           transactionId: queryResult.CheckoutRequestID,
@@ -60,14 +101,30 @@ export async function POST(request: Request) {
 
       if (queryResult.ResultCode === "1032") {
         // User cancelled
+        await updateOrderAndTransaction(
+          { payment_status: "failed", status: "cancelled" },
+          {
+            status: "failed",
+            result_code: queryResult.ResultCode,
+            result_desc: queryResult.ResultDesc,
+          }
+        )
         return NextResponse.json({
-          status: "failed",
+          status: "cancelled",
           message: "Payment was cancelled by user",
         })
       }
 
       if (queryResult.ResultCode === "1037") {
         // Timeout - STK push timed out
+        await updateOrderAndTransaction(
+          { payment_status: "failed", status: "cancelled" },
+          {
+            status: "failed",
+            result_code: queryResult.ResultCode,
+            result_desc: queryResult.ResultDesc,
+          }
+        )
         return NextResponse.json({
           status: "failed",
           message: "Payment request timed out. Please try again.",
