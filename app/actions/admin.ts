@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { initiateSTKPush } from "@/lib/mpesa"
 
 // Set to false for production
 const DEV_MODE = false
@@ -26,6 +27,20 @@ async function getSupabaseAdmin() {
   if (profile?.role !== "admin") return { error: "Not authorized", isAdmin: false }
 
   return { user, supabase, isAdmin: true }
+}
+
+function generateShopTicketNumber(): string {
+  const prefix = "POS"
+  const timestamp = Date.now().toString(36).toUpperCase()
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
+  return `${prefix}-${timestamp}-${random}`
+}
+
+function generateReceiptNumber(): string {
+  const prefix = "FG"
+  const timestamp = Date.now().toString(36).toUpperCase()
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
+  return `${prefix}-${timestamp}-${random}`
 }
 
 // Check if current user is admin
@@ -152,7 +167,7 @@ export async function getAdminOrders(filter?: "all" | "pending" | "completed" | 
     .order("created_at", { ascending: false })
 
   if (filter === "pending") {
-    query = query.eq("payment_status", "pending")
+    query = query.in("payment_status", ["pending", "stk_pushed"])
   } else if (filter === "completed") {
     query = query.eq("payment_status", "completed")
   } else if (filter === "cancelled") {
@@ -163,6 +178,26 @@ export async function getAdminOrders(filter?: "all" | "pending" | "completed" | 
 
   if (error) return { error: error.message, data: [] }
   return { data: data || [] }
+}
+
+export async function getAdminOrderById(orderId: string) {
+  const auth = await getSupabaseAdmin()
+  if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
+  const { supabase } = auth
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      order_items(*),
+      transactions(*),
+      profiles!orders_user_id_fkey(full_name, email, phone)
+    `)
+    .eq("id", orderId)
+    .single()
+
+  if (error) return { error: error.message }
+  return { data }
 }
 
 export async function updateOrderStatus(orderId: string, status: string, paymentStatus?: string) {
@@ -189,6 +224,18 @@ export async function verifyPayment(orderId: string, transactionId?: string) {
   if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
   const { supabase } = auth
 
+  let ticketNumber: string | undefined
+  if (transactionId === "CASH") {
+    const { data: existingOrder } = await supabase
+      .from("orders")
+      .select("ticket_number")
+      .eq("id", orderId)
+      .single()
+    if (!existingOrder?.ticket_number) {
+      ticketNumber = generateShopTicketNumber()
+    }
+  }
+
   // Update order
   const { error: orderError } = await supabase
     .from("orders")
@@ -196,6 +243,7 @@ export async function verifyPayment(orderId: string, transactionId?: string) {
       payment_status: "completed",
       status: "confirmed",
       mpesa_transaction_id: transactionId || "",
+      ...(ticketNumber ? { ticket_number: ticketNumber } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", orderId)
@@ -215,6 +263,185 @@ export async function verifyPayment(orderId: string, transactionId?: string) {
   }
 
   return { success: true }
+}
+
+export async function promptPayment(
+  orderId: string,
+  phoneNumber?: string,
+  message?: string
+) {
+  const auth = await getSupabaseAdmin()
+  if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
+  const { supabase } = auth
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, total, mpesa_number, user_id, ticket_number")
+    .eq("id", orderId)
+    .single()
+
+  if (orderError || !order) return { error: orderError?.message || "Order not found" }
+
+  const phone = phoneNumber || order.mpesa_number
+  if (!phone) return { error: "Phone number is required to send STK push" }
+
+  let rawOrigin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+
+  if (!rawOrigin) {
+    return {
+      error:
+        "Server URL not configured. Set NEXT_PUBLIC_APP_URL to your deployed URL.",
+    }
+  }
+
+  rawOrigin = rawOrigin.trim().replace(/\/+$/, "")
+  if (!rawOrigin.startsWith("http://") && !rawOrigin.startsWith("https://")) {
+    rawOrigin = `https://${rawOrigin}`
+  }
+
+  const callbackURL = `${rawOrigin}/api/mpesa/callback`
+
+  const stkResponse = await initiateSTKPush({
+    phoneNumber: phone,
+    amount: Math.ceil(Number(order.total)),
+    accountReference: `FoodGo-${order.id.slice(0, 8)}`,
+    transactionDesc: "FoodGo Order Payment",
+    callbackURL,
+  })
+
+  if (stkResponse.ResponseCode !== "0") {
+    return {
+      error:
+        stkResponse.ResponseDescription || "Failed to initiate M-Pesa payment",
+    }
+  }
+
+  const ticketNumber = order.ticket_number || generateShopTicketNumber()
+
+  await supabase
+    .from("orders")
+    .update({
+      mpesa_transaction_id: stkResponse.CheckoutRequestID,
+      payment_status: "stk_pushed",
+      ticket_number: ticketNumber,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId)
+
+  const { data: existingTxn } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("order_id", orderId)
+    .maybeSingle()
+
+  const note = message?.trim()
+    ? `Admin prompt: ${message.trim()}`
+    : undefined
+
+  if (existingTxn?.id) {
+    await supabase
+      .from("transactions")
+      .update({
+        phone_number: phone,
+        amount: Number(order.total),
+        checkout_request_id: stkResponse.CheckoutRequestID,
+        merchant_request_id: stkResponse.MerchantRequestID,
+        status: "stk_pushed",
+        ...(note ? { result_desc: note } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existingTxn.id)
+  } else {
+    await supabase.from("transactions").insert({
+      user_id: order.user_id,
+      order_id: orderId,
+      phone_number: phone,
+      amount: Number(order.total),
+      checkout_request_id: stkResponse.CheckoutRequestID,
+      merchant_request_id: stkResponse.MerchantRequestID,
+      status: "stk_pushed",
+      ...(note ? { result_desc: note } : {}),
+    })
+  }
+
+  return {
+    success: true,
+    data: {
+      checkoutRequestId: stkResponse.CheckoutRequestID,
+      merchantRequestId: stkResponse.MerchantRequestID,
+      customerMessage: stkResponse.CustomerMessage,
+    },
+  }
+}
+
+export async function createInShopOrder(input: {
+  amount: number
+  phoneNumber?: string
+  message?: string
+  promptPayment?: boolean
+  cashPaid?: boolean
+}) {
+  const auth = await getSupabaseAdmin()
+  if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
+  const { supabase, user } = auth
+
+  if (!user?.id) return { error: "Admin user not found" }
+  if (!input.amount || Number.isNaN(input.amount) || input.amount <= 0) {
+    return { error: "Amount must be greater than 0" }
+  }
+
+  const ticketNumber = generateShopTicketNumber()
+  const receiptNumber = generateReceiptNumber()
+  const phone = input.phoneNumber?.trim() || ""
+  const note = input.message?.trim()
+    ? `Admin prompt: ${input.message.trim()}`
+    : null
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert({
+      user_id: user.id,
+      status: "pending",
+      total: Number(input.amount),
+      delivery_fee: 0,
+      discount: 0,
+      delivery_address: "In-shop",
+      mpesa_number: phone,
+      mpesa_transaction_id: "",
+      payment_status: "pending",
+      receipt_number: receiptNumber,
+      ticket_number: ticketNumber,
+    })
+    .select()
+    .single()
+
+  if (orderError || !order) return { error: orderError?.message || "Failed to create order" }
+
+  await supabase.from("transactions").insert({
+    user_id: user.id,
+    order_id: order.id,
+    phone_number: phone,
+    amount: Number(input.amount),
+    status: input.cashPaid ? "completed" : "pending",
+    ...(note ? { result_desc: note } : {}),
+  })
+
+  if (input.cashPaid) {
+    await verifyPayment(order.id, "CASH")
+    return { success: true, data: { orderId: order.id, ticketNumber } }
+  }
+
+  if (input.promptPayment) {
+    const promptResult = await promptPayment(order.id, phone, input.message)
+    if (promptResult?.error) return { error: promptResult.error }
+  }
+
+  return { success: true, data: { orderId: order.id, ticketNumber } }
 }
 
 // ==================== FOOD MANAGEMENT ====================

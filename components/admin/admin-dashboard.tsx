@@ -21,7 +21,7 @@ import { AdminFood } from "./admin-food"
 import { AdminTransactions } from "./admin-transactions"
 import { LoadingSpinner } from "@/components/loading-spinner"
 
-type Tab = "overview" | "orders" | "food" | "transactions"
+type Tab = "overview" | "orders" | "inshop" | "food" | "transactions"
 
 interface Stats {
   totalEarnings: number
@@ -64,6 +64,7 @@ export function AdminDashboard() {
   const navItems = [
     { id: "overview" as Tab, label: "Overview", icon: LayoutDashboard },
     { id: "orders" as Tab, label: "Orders", icon: ShoppingBag },
+    { id: "inshop" as Tab, label: "In-Shop Orders", icon: ShoppingBag },
     { id: "food" as Tab, label: "Food Menu", icon: UtensilsCrossed },
     { id: "transactions" as Tab, label: "Transactions", icon: Receipt },
   ]
@@ -160,6 +161,7 @@ export function AdminDashboard() {
               <AdminOverview stats={stats} statCards={statCards} onRefresh={loadStats} />
             )}
             {activeTab === "orders" && <AdminOrders />}
+            {activeTab === "inshop" && <AdminOrders orderSource="inshop" />}
             {activeTab === "food" && <AdminFood />}
             {activeTab === "transactions" && <AdminTransactions />}
           </>
