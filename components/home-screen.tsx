@@ -265,7 +265,7 @@ export function HomeScreen({
                         </p>
                       </div>
                       <span className="text-xs font-semibold text-primary">
-                        ${item.price.toFixed(2)}
+                        KSh {item.price.toFixed(2)}
                       </span>
                     </button>
                   ))}
@@ -293,7 +293,7 @@ export function HomeScreen({
                     Summer Combo
                   </p>
                   <p className="text-card text-2xl font-bold mt-1">
-                    $10.88
+                    KSh 10.88
                   </p>
                 </div>
               </button>
@@ -378,7 +378,7 @@ export function HomeScreen({
                       {item.name}
                     </h4>
                     <span className="text-sm font-semibold text-primary">
-                      ${item.price.toFixed(2)}
+                      KSh {item.price.toFixed(2)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -485,7 +485,7 @@ export function HomeScreen({
                   </p>
                 </div>
                 <span className="text-[10px] text-primary font-semibold">
-                  ${item.price.toFixed(2)}
+                  KSh {item.price.toFixed(2)}
                 </span>
               </button>
             ))}

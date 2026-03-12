@@ -68,7 +68,7 @@ export function ProductDetail({ item, onBack, onAddToCart }: ProductDetailProps)
             <span className="text-xs text-muted-foreground ml-1">{item.rating}/5</span>
           </div>
 
-          <p className="text-2xl font-bold text-foreground mt-3">${item.price.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-foreground mt-3">KSh {item.price.toFixed(2)}</p>
 
           <div className="flex gap-4 mt-3">
             <div className="flex flex-col">
@@ -219,7 +219,7 @@ export function ProductDetail({ item, onBack, onAddToCart }: ProductDetailProps)
           onClick={() => onAddToCart(item, quantity, selectedToppings, selectedSides)}
           className="bg-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity"
         >
-          Add to cart (${totalPrice})
+          Add to cart (KSh {totalPrice})
         </button>
       </div>
     </div>

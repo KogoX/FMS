@@ -291,7 +291,7 @@ export function AdminFood() {
                   <p className="text-xs text-muted-foreground">{item.category}</p>
                 </div>
                 <span className="text-sm font-bold text-primary whitespace-nowrap">
-                  ${item.price.toFixed(2)}
+                  KSh {item.price.toFixed(2)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
@@ -364,7 +364,7 @@ export function AdminFood() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    Price ($) *
+                    Price (KSh) *
                   </label>
                   <input
                     type="number"

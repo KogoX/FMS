@@ -307,7 +307,7 @@ export function AdminOrders() {
                           )}
                         </div>
                         <span className="text-sm font-medium text-foreground">
-                          ${(item.food_price * item.quantity).toFixed(2)}
+                          KSh {(item.food_price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     ))}

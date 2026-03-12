@@ -135,7 +135,7 @@ export function SearchScreen({
                   {item.name}
                 </h4>
                 <p className="text-xs text-muted-foreground">
-                  From ${item.price.toFixed(1)}
+                  From KSh {item.price.toFixed(1)}
                 </p>
                 <button
                   type="button"
