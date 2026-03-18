@@ -87,7 +87,7 @@ export async function createPendingOrder(input: {
 }
 
 /**
- * Step 2: After STK push is confirmed, finalize the order and clear cart
+ * Step 2: After STK push is confirmed, finalize the order
  */
 export async function finalizeOrder(orderId: string) {
   const supabase = await createClient()
@@ -95,9 +95,6 @@ export async function finalizeOrder(orderId: string) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
-
-  // Clear user's cart items
-  await supabase.from("cart_items").delete().eq("user_id", user.id)
 
   return { success: true }
 }

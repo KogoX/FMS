@@ -194,7 +194,6 @@ export function CartScreen({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phoneNumber: profile.mpesaNumber,
-          amount: totalKSh,
           orderId: newOrderId,
         }),
       })

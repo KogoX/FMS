@@ -1,7 +1,7 @@
 "use server"
 
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
 interface CallbackItem {
   Name: string
@@ -26,7 +26,11 @@ export async function POST(request: Request) {
   try {
     const body: STKCallback = await request.json()
     const callback = body.Body.stkCallback
-    const supabase = await createClient()
+    
+    // Use service role key to bypass RLS since callbacks are unauthenticated
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     if (callback.ResultCode === 0) {
       // Payment successful

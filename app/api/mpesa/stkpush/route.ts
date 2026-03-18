@@ -14,14 +14,32 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { phoneNumber, amount, orderId } = body
+    const { phoneNumber, orderId } = body
 
-    if (!phoneNumber || !amount || !orderId) {
+    if (!phoneNumber || !orderId) {
       return NextResponse.json(
-        { error: "Missing phoneNumber, amount, or orderId" },
+        { error: "Missing phoneNumber or orderId" },
         { status: 400 }
       )
     }
+
+    // Fetch the correct order details from the database
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("total")
+      .eq("id", orderId)
+      .eq("user_id", user.id)
+      .single()
+
+    if (orderError || !order) {
+      return NextResponse.json(
+        { error: "Order not found or unauthorized" },
+        { status: 404 }
+      )
+    }
+
+    // Convert total to KSh mathematically
+    const validatedAmountKSh = Math.ceil(order.total * 130)
 
     // Build callback URL - must be publicly reachable HTTPS
     // Priority: explicit app URL > Vercel production URL > Vercel branch URL
@@ -51,7 +69,7 @@ export async function POST(request: Request) {
 
     const stkResponse = await initiateSTKPush({
       phoneNumber,
-      amount: Math.ceil(amount),
+      amount: validatedAmountKSh,
       accountReference: `FoodGo-${orderId.slice(0, 8)}`,
       transactionDesc: "FoodGo Order Payment",
       callbackURL,
