@@ -30,6 +30,7 @@ interface FoodItem {
   rating: number
   delivery_time: string
   bun_type?: string
+  is_available?: boolean
 }
 
 const CATEGORIES = ["Burgers", "Pizza", "Chicken", "Drinks", "Sides", "Desserts"]
@@ -58,6 +59,7 @@ export function AdminFood() {
     rating: "4.5",
     delivery_time: "15-20 min",
     bun_type: "",
+    is_available: true,
   })
 
   const loadFoodItems = useCallback(async () => {
@@ -97,6 +99,7 @@ export function AdminFood() {
       rating: "4.5",
       delivery_time: "15-20 min",
       bun_type: "",
+      is_available: true,
     })
     setEditingItem(null)
   }
@@ -119,6 +122,7 @@ export function AdminFood() {
       rating: item.rating.toString(),
       delivery_time: item.delivery_time,
       bun_type: item.bun_type || "",
+      is_available: item.is_available ?? true,
     })
     setShowModal(true)
   }
@@ -140,6 +144,7 @@ export function AdminFood() {
       rating: parseFloat(form.rating) || 4.5,
       delivery_time: form.delivery_time,
       bun_type: form.bun_type || undefined,
+      is_available: form.is_available,
     }
 
     if (editingItem) {
@@ -176,8 +181,6 @@ export function AdminFood() {
     if (result.error) {
       setFoodItems(previousItems)
       setErrorMsg(result.error)
-    } else if (result.softDeleted) {
-      setInfoMsg("Item could not be fully deleted, so it was hidden instead.")
     }
     setDeleting(null)
   }
@@ -294,6 +297,11 @@ export function AdminFood() {
                   KSh {item.price.toFixed(2)}
                 </span>
               </div>
+              {item.is_available === false && (
+                <span className="inline-block mt-1 px-2 py-0.5 bg-destructive/10 text-destructive text-[10px] font-bold rounded-sm uppercase tracking-wider">
+                  Unavailable
+                </span>
+              )}
               <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
                 {item.description}
               </p>
@@ -480,7 +488,20 @@ export function AdminFood() {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="is_available"
+                  checked={form.is_available}
+                  onChange={(e) => setForm({ ...form, is_available: e.target.checked })}
+                  className="w-4 h-4 text-primary bg-secondary border-border rounded focus:ring-primary/50"
+                />
+                <label htmlFor="is_available" className="text-sm font-medium text-foreground">
+                  Available for ordering
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {

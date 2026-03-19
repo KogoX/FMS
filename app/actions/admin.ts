@@ -470,6 +470,7 @@ export async function getAdminFoodItems() {
     rating: Number(item.rating),
     delivery_time: item.delivery_time,
     bun_type: item.bun_type || undefined,
+    is_available: item.is_available,
   }))
   return { data: normalized }
 }
@@ -485,6 +486,7 @@ export async function createFoodItem(input: {
   rating: number
   delivery_time: string
   bun_type?: string
+  is_available?: boolean
 }) {
   const auth = await getSupabaseAdmin()
   if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
@@ -504,7 +506,7 @@ export async function createFoodItem(input: {
       rating_count: 0,
       delivery_time: input.delivery_time,
       bun_type: input.bun_type || null,
-      is_available: true,
+      is_available: input.is_available !== undefined ? input.is_available : true,
     })
     .select()
     .single()
@@ -526,6 +528,7 @@ export async function updateFoodItem(
     rating?: number
     delivery_time?: string
     bun_type?: string
+    is_available?: boolean
   }
 ) {
   const auth = await getSupabaseAdmin()
@@ -546,6 +549,7 @@ export async function updateFoodItem(
   if (input.delivery_time !== undefined)
     updatePayload.delivery_time = input.delivery_time
   if (input.bun_type !== undefined) updatePayload.bun_type = input.bun_type || null
+  if (input.is_available !== undefined) updatePayload.is_available = input.is_available
 
   const { data, error } = await supabase
     .from("food_items")
@@ -563,18 +567,25 @@ export async function deleteFoodItem(id: string) {
   if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
   const { supabase } = auth
 
+  // Check if item has been ordered
+  const { count, error: countError } = await supabase
+    .from("order_items")
+    .select("*", { count: "exact", head: true })
+    .eq("food_item_id", id)
+
+  if (countError) return { error: countError.message }
+
+  if (count && count > 0) {
+    return { error: "Cannot delete this food item because it has existing orders. Please edit it to mark as unavailable instead." }
+  }
+
   const { error } = await supabase
     .from("food_items")
     .delete()
     .eq("id", id)
 
   if (error) {
-    const { error: softError } = await supabase
-      .from("food_items")
-      .update({ is_available: false, updated_at: new Date().toISOString() })
-      .eq("id", id)
-    if (softError) return { error: error.message }
-    return { success: true, softDeleted: true }
+    return { error: error.message }
   }
   return { success: true }
 }
