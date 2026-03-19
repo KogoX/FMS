@@ -535,9 +535,7 @@ export async function updateFoodItem(
   if (!auth.isAdmin || !auth.supabase) return { error: auth.error }
   const { supabase } = auth
 
-  const updatePayload: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  }
+  const updatePayload: Record<string, unknown> = {}
   if (input.name !== undefined) updatePayload.name = input.name
   if (input.category !== undefined) updatePayload.category = input.category
   if (input.price !== undefined) updatePayload.price = input.price

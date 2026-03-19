@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     try {
       const queryResult = await querySTKPushStatus(checkoutRequestId)
 
-      if (queryResult.ResultCode === "0") {
+      if (String(queryResult.ResultCode) === "0") {
         // Payment completed
         let parsedReceipt = queryResult.CheckoutRequestID;
         // Check for receipt in format: "[SAJ1234567] The service request..."
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
         })
       }
 
-      if (queryResult.ResultCode === "1032") {
+      if (String(queryResult.ResultCode) === "1032") {
         // User cancelled
         await updateOrderAndTransaction(
           { payment_status: "failed", status: "cancelled" },
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         })
       }
 
-      if (queryResult.ResultCode === "1037") {
+      if (String(queryResult.ResultCode) === "1037") {
         // Timeout - STK push timed out
         await updateOrderAndTransaction(
           { payment_status: "failed", status: "cancelled" },
