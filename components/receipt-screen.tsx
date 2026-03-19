@@ -199,13 +199,13 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
   const isPaid = order.payment_status === "completed"
   const canCancel =
     order.status === "pending" && order.payment_status === "pending"
-  const totalKSh = Math.ceil(Number(order.total) * 130)
+  const totalKSh = Math.ceil(Number(order.total))
   const subtotalKSh = order.order_items.reduce(
-    (sum, item) => sum + Math.ceil(Number(item.food_price) * item.quantity * 130),
+    (sum, item) => sum + Math.ceil(Number(item.food_price) * item.quantity),
     0
   )
-  const discountKSh = Math.ceil(Number(order.discount) * 130)
-  const deliveryKSh = Math.ceil(Number(order.delivery_fee) * 130)
+  const discountKSh = Math.ceil(Number(order.discount))
+  const deliveryKSh = Math.ceil(Number(order.delivery_fee))
 
   return (
     <div className="flex flex-col pb-20 bg-card min-h-screen">
@@ -358,7 +358,7 @@ export function ReceiptScreen({ orderId, onBack }: ReceiptScreenProps) {
                     <p className="text-sm font-semibold text-foreground ml-4">
                       KSh{" "}
                       {Math.ceil(
-                        Number(item.food_price) * item.quantity * 130
+                        Number(item.food_price) * item.quantity
                       )}
                     </p>
                   </div>
@@ -581,7 +581,7 @@ function generateTextReceipt(
   lines.push("-".repeat(w))
 
   for (const item of order.order_items) {
-    const itemTotal = Math.ceil(Number(item.food_price) * item.quantity * 130)
+    const itemTotal = Math.ceil(Number(item.food_price) * item.quantity)
     lines.push(`${item.food_name} x${item.quantity}`)
     lines.push(`${" ".repeat(28)}KSh ${itemTotal}`)
     if (item.selected_toppings.length > 0) {

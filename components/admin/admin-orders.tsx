@@ -452,7 +452,7 @@ export function AdminOrders({ orderSource = "all" }: { orderSource?: OrderSource
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-lg font-bold text-foreground">
-                      KSh {(Number(order.total) * 130).toLocaleString()}
+                      KSh {Number(order.total).toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {order.order_items?.length || 0} items

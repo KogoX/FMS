@@ -73,7 +73,7 @@ export function CartScreen({
   const discount = subtotal > 30 ? 1.45 : 0
   const deliveryFee = 0
   const total = subtotal - discount + deliveryFee
-  const totalKSh = Math.ceil(total * 130)
+  const totalKSh = Math.ceil(total)
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -296,7 +296,7 @@ export function CartScreen({
                     {item.food.name}
                   </h4>
                   <p className="text-sm font-bold text-primary mt-0.5">
-                    KSh {(item.food.price * item.quantity * 130).toFixed(0)}
+                    KSh {(item.food.price * item.quantity).toFixed(0)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -399,7 +399,7 @@ export function CartScreen({
                   Total Items ({cartItems.length})
                 </span>
                 <span className="text-xs font-semibold text-foreground">
-                  KSh {(subtotal * 130).toFixed(0)}
+                  KSh {subtotal.toFixed(0)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -416,7 +416,7 @@ export function CartScreen({
                     Discount
                   </span>
                   <span className="text-xs font-semibold text-green-600">
-                    -KSh {(discount * 130).toFixed(0)}
+                    -KSh {discount.toFixed(0)}
                   </span>
                 </div>
               )}

@@ -139,7 +139,7 @@ export function OrdersScreen({ onBack, onViewReceipt }: OrdersScreenProps) {
               (sum, item) => sum + item.quantity,
               0
             )
-            const totalKSh = Math.ceil(Number(order.total) * 130)
+            const totalKSh = Math.ceil(Number(order.total))
             const transaction = order.transactions?.[0]
 
             return (

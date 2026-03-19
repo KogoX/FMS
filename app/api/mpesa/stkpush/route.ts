@@ -38,8 +38,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Convert total to KSh mathematically
-    const validatedAmountKSh = Math.ceil(order.total * 130)
+    // Use total directly as KSh
+    const validatedAmountKSh = Math.ceil(order.total)
 
     // Build callback URL - must be publicly reachable HTTPS
     // Priority: explicit app URL > Vercel production URL > Vercel branch URL
