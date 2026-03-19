@@ -85,17 +85,38 @@ export async function POST(request: Request) {
 
       if (queryResult.ResultCode === "0") {
         // Payment completed
-        await updateOrderAndTransaction(
-          { payment_status: "completed", status: "confirmed" },
-          {
-            status: "completed",
-            result_code: queryResult.ResultCode,
-            result_desc: queryResult.ResultDesc,
+        let parsedReceipt = queryResult.CheckoutRequestID;
+        // Check for receipt in format: "[SAJ1234567] The service request..."
+        const match = queryResult.ResultDesc?.match(/\[([a-zA-Z0-9]+)\]/);
+        if (match && match[1]) {
+          parsedReceipt = match[1];
+        } else {
+          // fallback regex looking for a 10-char alphanumeric M-Pesa receipt
+          const fallbackMatch = queryResult.ResultDesc?.match(/([A-Z0-9]{10})/);
+          if (fallbackMatch && fallbackMatch[1]) {
+            parsedReceipt = fallbackMatch[1];
           }
-        )
+        }
+
+        const updates: any = { payment_status: "completed", status: "confirmed" };
+        if (parsedReceipt !== queryResult.CheckoutRequestID) {
+          updates.mpesa_transaction_id = parsedReceipt;
+        }
+
+        const transactionUpdates: any = {
+          status: "completed",
+          result_code: queryResult.ResultCode,
+          result_desc: queryResult.ResultDesc,
+        };
+        if (parsedReceipt !== queryResult.CheckoutRequestID) {
+          transactionUpdates.mpesa_receipt_number = parsedReceipt;
+        }
+
+        await updateOrderAndTransaction(updates, transactionUpdates);
+        
         return NextResponse.json({
           status: "completed",
-          transactionId: queryResult.CheckoutRequestID,
+          transactionId: parsedReceipt,
         })
       }
 
