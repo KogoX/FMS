@@ -59,3 +59,26 @@ export async function getUser() {
   const { data: { user } } = await supabase.auth.getUser()
   return user
 }
+
+export async function signInWithProvider(provider: 'google' | 'facebook') {
+  const supabase = await createClient()
+
+  const redirectUrl = process.env.NEXT_PUBLIC_APP_URL 
+    ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`
+    : process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}/api/auth/callback`
+      : "http://localhost:3000/api/auth/callback"
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: redirectUrl,
+    },
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { data }
+}

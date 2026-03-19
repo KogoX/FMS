@@ -4,7 +4,7 @@ import React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { signIn, signUp } from "@/app/actions/auth"
+import { signIn, signUp, signInWithProvider } from "@/app/actions/auth"
 
 interface AuthScreenProps {
   onLogin: (user: { id: string; email: string; fullName: string }) => void
@@ -63,6 +63,22 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
             fullName: result.data.user.user_metadata?.full_name || "",
           })
         }
+      }
+    } catch {
+      setError("An unexpected error occurred")
+    }
+    setLoading(false)
+  }
+
+  const handleOAuth = async (provider: 'google' | 'facebook') => {
+    setError(null)
+    setLoading(true)
+    try {
+      const result = await signInWithProvider(provider)
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data?.url) {
+        window.location.href = result.data.url
       }
     } catch {
       setError("An unexpected error occurred")
@@ -251,6 +267,36 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
             </>
           )}
         </p>
+        
+        <div className="relative mt-4 mb-2">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
+            <span className="bg-card px-3 text-muted-foreground/60">
+              Or continue with
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => handleOAuth("google")}
+            disabled={loading}
+            className="flex-1 bg-secondary text-foreground py-3 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 border border-border disabled:opacity-70"
+          >
+            Google
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOAuth("facebook")}
+            disabled={loading}
+            className="flex-1 bg-[#1877F2] text-white py-3 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            Facebook
+          </button>
+        </div>
       </form>
     </div>
   )
