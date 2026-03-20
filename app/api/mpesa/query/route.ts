@@ -32,9 +32,27 @@ export async function POST(request: Request) {
         .single()
 
       if (order?.payment_status === "completed") {
+        let receiptId = order.mpesa_transaction_id
+
+        // Check transactions table for the real M-Pesa receipt
+        if (!receiptId || receiptId.startsWith("ws_CO")) {
+          const { data: txn } = await supabase
+            .from("transactions")
+            .select("mpesa_receipt_number")
+            .eq("order_id", orderId)
+            .eq("user_id", user.id)
+            .single()
+
+          if (txn?.mpesa_receipt_number) {
+            receiptId = txn.mpesa_receipt_number
+          }
+        }
+
+        const isPending = !receiptId || receiptId.startsWith("ws_CO")
         return NextResponse.json({
           status: "completed",
-          transactionId: order.mpesa_transaction_id,
+          transactionId: receiptId || checkoutRequestId,
+          receiptPending: isPending,
         })
       }
 
@@ -84,39 +102,70 @@ export async function POST(request: Request) {
       const queryResult = await querySTKPushStatus(checkoutRequestId)
 
       if (String(queryResult.ResultCode) === "0") {
-        // Payment completed
-        let parsedReceipt = queryResult.CheckoutRequestID;
-        // Check for receipt in format: "[SAJ1234567] The service request..."
-        const match = queryResult.ResultDesc?.match(/\[([a-zA-Z0-9]+)\]/);
-        if (match && match[1]) {
-          parsedReceipt = match[1];
-        } else {
-          // fallback regex looking for a 10-char alphanumeric M-Pesa receipt
-          const fallbackMatch = queryResult.ResultDesc?.match(/([A-Z0-9]{10})/);
-          if (fallbackMatch && fallbackMatch[1]) {
-            parsedReceipt = fallbackMatch[1];
+        // Payment completed — Daraja STK Query does NOT return the real
+        // M-Pesa receipt. The receipt only arrives via the callback webhook.
+        // We update the order status here, then re-read the DB to see if
+        // the callback has already written the real receipt.
+
+        // Mark order as completed (callback may have already done this)
+        await updateOrderAndTransaction(
+          { payment_status: "completed", status: "confirmed" },
+          {
+            status: "completed",
+            result_code: queryResult.ResultCode,
+            result_desc: queryResult.ResultDesc,
+          }
+        )
+
+        // Brief delay to give the callback a chance to land first
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        // Re-read the order to pick up the callback-updated receipt
+        let realReceipt: string | null = null
+        if (orderId) {
+          const { data: freshOrder } = await supabase
+            .from("orders")
+            .select("mpesa_transaction_id")
+            .eq("id", orderId)
+            .eq("user_id", user.id)
+            .single()
+
+          if (freshOrder?.mpesa_transaction_id) {
+            realReceipt = freshOrder.mpesa_transaction_id
           }
         }
 
-        const updates: any = { payment_status: "completed", status: "confirmed" };
-        if (parsedReceipt !== queryResult.CheckoutRequestID) {
-          updates.mpesa_transaction_id = parsedReceipt;
+        // Also check the transaction table for the receipt
+        if (!realReceipt || realReceipt.startsWith("ws_CO")) {
+          const txnQuery = orderId
+            ? supabase
+                .from("transactions")
+                .select("mpesa_receipt_number")
+                .eq("order_id", orderId)
+                .eq("user_id", user.id)
+                .single()
+            : supabase
+                .from("transactions")
+                .select("mpesa_receipt_number")
+                .eq("checkout_request_id", checkoutRequestId)
+                .eq("user_id", user.id)
+                .single()
+
+          const { data: txn } = await txnQuery
+          if (txn?.mpesa_receipt_number) {
+            realReceipt = txn.mpesa_receipt_number
+          }
         }
 
-        const transactionUpdates: any = {
-          status: "completed",
-          result_code: queryResult.ResultCode,
-          result_desc: queryResult.ResultDesc,
-        };
-        if (parsedReceipt !== queryResult.CheckoutRequestID) {
-          transactionUpdates.mpesa_receipt_number = parsedReceipt;
-        }
+        const finalReceipt =
+          realReceipt && !realReceipt.startsWith("ws_CO")
+            ? realReceipt
+            : checkoutRequestId
 
-        await updateOrderAndTransaction(updates, transactionUpdates);
-        
         return NextResponse.json({
           status: "completed",
-          transactionId: parsedReceipt,
+          transactionId: finalReceipt,
+          receiptPending: finalReceipt === checkoutRequestId,
         })
       }
 

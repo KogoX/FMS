@@ -128,6 +128,40 @@ export function CartScreen({
           stopPolling()
           setTransactionId(data.transactionId || checkoutId)
           setPaymentState("success")
+
+          // If receipt is still pending (callback hasn't fired yet),
+          // retry a few times to get the real M-Pesa receipt
+          if (data.receiptPending) {
+            let retries = 0
+            const receiptInterval = setInterval(async () => {
+              retries++
+              if (retries > 5) {
+                clearInterval(receiptInterval)
+                return
+              }
+              try {
+                const retryRes = await fetch("/api/mpesa/query", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    checkoutRequestId: checkoutId,
+                    orderId: orderIdForPoll,
+                  }),
+                })
+                if (retryRes.ok) {
+                  const retryData = await retryRes.json()
+                  if (!retryData.receiptPending && retryData.transactionId) {
+                    setTransactionId(retryData.transactionId)
+                    clearInterval(receiptInterval)
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }, 3000)
+          }
+
           // Clear cart in DB and notify parent
           if (orderIdForPoll) {
             finalizeOrder(orderIdForPoll)
@@ -150,7 +184,7 @@ export function CartScreen({
         }
       }, 3000)
     },
-    [stopPolling]
+    [stopPolling, onOrderComplete]
   )
 
   const handleOrderNow = () => {
