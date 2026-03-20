@@ -554,7 +554,7 @@ function generateTextReceipt(
   order: Order,
   profile: Profile | null
 ): string {
-  const totalKSh = Math.ceil(Number(order.total) * 130)
+  const totalKSh = Math.ceil(Number(order.total))
   const transaction = order.transactions?.[0]
   const receiptCode =
     transaction?.mpesa_receipt_number ||
@@ -593,7 +593,7 @@ function generateTextReceipt(
   }
 
   lines.push("-".repeat(w))
-  const discountKSh = Math.ceil(Number(order.discount) * 130)
+  const discountKSh = Math.ceil(Number(order.discount))
   lines.push(padLine("Subtotal:", `KSh ${totalKSh + discountKSh}`, w))
   lines.push(padLine("Delivery:", "Free", w))
   if (discountKSh > 0) {
