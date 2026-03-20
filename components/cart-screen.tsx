@@ -99,8 +99,8 @@ export function CartScreen({
       pollIntervalRef.current = setInterval(async () => {
         pollCountRef.current += 1
 
-        // Stop after 60 polls (2 minutes at 2s intervals)
-        if (pollCountRef.current > 60) {
+        // Stop after 100 polls (5 minutes at 3s intervals)
+        if (pollCountRef.current > 100) {
           stopPolling()
           setPaymentState("failed")
           setErrorMessage(
@@ -148,7 +148,7 @@ export function CartScreen({
         } catch {
           // Network error, keep polling
         }
-      }, 2000)
+      }, 3000)
     },
     [stopPolling]
   )

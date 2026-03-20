@@ -29,10 +29,10 @@ export async function POST(request: Request) {
     
     // Use service role key to bypass RLS since callbacks are unauthenticated
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (callback.ResultCode === 0) {
+    if (String(callback.ResultCode) === "0") {
       // Payment successful
       const metadata = callback.CallbackMetadata?.Item || []
       const mpesaReceiptNumber = String(
