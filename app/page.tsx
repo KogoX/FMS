@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { AuthScreen } from "@/components/auth-screen"
-import { LoginSuccess } from "@/components/login-success"
 import { HomeScreen } from "@/components/home-screen"
 import { SearchScreen } from "@/components/search-screen"
 import { ProductDetail } from "@/components/product-detail"
@@ -19,8 +18,9 @@ import { getProfile, updateProfile as updateProfileAction } from "@/app/actions/
 import { getFoodItems } from "@/app/actions/food"
 import { signOut } from "@/app/actions/auth"
 import { createPendingOrder } from "@/app/actions/orders"
+import { toast } from "sonner"
 
-type AppState = "loading" | "auth" | "login-success" | "app"
+type AppState = "loading" | "auth" | "app"
 
 const defaultProfile: UserProfile = {
   fullName: "",
@@ -132,11 +132,11 @@ export default function Page() {
         email: user.email,
       })
     }
-    setAppState("login-success")
-  }, [])
-
-  const handleContinue = useCallback(() => {
     setAppState("app")
+    toast.success("Login Successful", {
+      duration: 3000,
+      style: { backgroundColor: '#22c55e', color: 'white', border: 'none' }
+    })
   }, [])
 
   const handleNavigateSearch = useCallback((category?: string) => {
@@ -279,14 +279,6 @@ export default function Page() {
     return (
       <main className="max-w-md md:max-w-lg lg:max-w-xl mx-auto min-h-screen bg-card shadow-xl">
         <AuthScreen onLogin={handleLogin} />
-      </main>
-    )
-  }
-
-  if (appState === "login-success") {
-    return (
-      <main className="max-w-md md:max-w-lg lg:max-w-xl mx-auto min-h-screen bg-card shadow-xl">
-        <LoginSuccess onContinue={handleContinue} />
       </main>
     )
   }
